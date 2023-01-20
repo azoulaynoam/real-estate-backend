@@ -118,13 +118,12 @@ const middleware = async (
 };
 
 // Property Creation & Save on DB.
-const create_property = async (req: Request<IProperty>, res: Response) => {
-  let property: IProperty = req.body;
+const create_property = async (req: Request, res: Response) => {
+  const property = new propertyModel(req.body);
   const { images, video } = await get_new_files(req.files);
   property.status = true;
   if (images && Array.isArray(images)) property.images = images;
   if (video && !Array.isArray(video)) property.video = video;
-  property = new propertyModel(property);
   const saved = await property.save();
   if (saved) res.status(201).json(saved);
   else res.sendStatus(500);

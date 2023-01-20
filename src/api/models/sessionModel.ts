@@ -1,7 +1,8 @@
 "use strict";
-import { Document, Schema, model as mongooseModel } from "mongoose";
+import connection from "../../db/connections";
+import { Schema } from "mongoose";
 
-interface ISession extends Document {
+interface ISession {
   user_id: Schema.Types.ObjectId;
   token: string;
   login_date: Date;
@@ -16,6 +17,7 @@ const SessionSchema = new Schema<ISession>(
   {
     user_id: {
       type: Schema.Types.ObjectId,
+      ref: "Users",
       require: true,
     },
     token: {
@@ -40,5 +42,5 @@ const SessionSchema = new Schema<ISession>(
   { timestamps: true }
 );
 
-const sessionModel = mongooseModel<ISession>("Sessions", SessionSchema);
+const sessionModel = connection.model<ISession>("Sessions", SessionSchema);
 export { sessionModel, ISession };

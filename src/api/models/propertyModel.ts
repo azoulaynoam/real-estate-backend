@@ -1,7 +1,8 @@
 "use strict";
-import { Document, Schema, model as mongooseModel } from "mongoose";
+import { Schema } from "mongoose";
+import connection from "../../db/connections";
 
-interface IProperty extends Document {
+interface IProperty {
   action: string;
   status: boolean;
   free_text_en: string;
@@ -84,5 +85,5 @@ var PropertySchema = new Schema<IProperty>(
   { timestamps: true }
 );
 
-const propertyModel = mongooseModel<IProperty>("Properties", PropertySchema);
+const propertyModel = connection.model<IProperty>("Properties", PropertySchema);
 export { IProperty, propertyModel };

@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import compression from "compression";
 import express from "express";
-import mongoose from "mongoose";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import path from "path";
@@ -11,16 +10,6 @@ dotenv.config();
 
 const app = express();
 
-mongoose.Promise = global.Promise;
-const uri = process.env.MONGO_URL;
-if (!uri) throw new Error("No Mongo URL provided");
-const connection = mongoose.createConnection(uri);
-
-export default connection;
-
-const User = require("./api/models/userModel");
-const Session = require("./api/models/sessionModel");
-const Property = require("./api/models/propertyModel");
 import routes from "./api/routes/propertyRoute";
 
 const storage = multer.diskStorage({

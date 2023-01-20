@@ -1,7 +1,8 @@
 "use strict";
-import { model as mongooseModel, Schema, Document } from "mongoose";
+import { Schema } from "mongoose";
+import connection from "../../db/connections";
 
-interface IUser extends Document {
+interface IUser {
   username: string;
   password: string;
   permission: number;
@@ -27,5 +28,5 @@ var UserSchema = new Schema<IUser>(
   { timestamps: true }
 );
 
-const UserModel = mongooseModel("Users", UserSchema);
+const UserModel = connection.model("Users", UserSchema);
 export { IUser, UserModel };
