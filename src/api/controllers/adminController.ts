@@ -12,7 +12,7 @@ var User = mongoClient.model<IUser>("Users");
 /**
  * Logging a user and storing a cookie with a token with experation of 1 week.
  */
-exports.login = function (req: Request, res: Response) {
+const login = function (req: Request, res: Response) {
   User.findOne(
     {
       username: req.body.username,
@@ -50,18 +50,18 @@ exports.login = function (req: Request, res: Response) {
 /**
  * Logging a user out.
  */
-exports.log_out = function (req: Request, res: Response) {
+const log_out = function (req: Request, res: Response) {
   delete_session(req, res);
 };
 
 /**
  * Registeration
  */
-exports.register = function (req: Request, res: Response) {
+const register = async (req: Request, res: Response) => {
   bcryptjs.hash(
     req.body.password,
     10,
-    function (err: Error, password_hash: string) {
+    async (err: Error, password_hash: string) => {
       if (err) {
         res.status(401).send("Error: Please enter password.");
       } else {
@@ -69,23 +69,28 @@ exports.register = function (req: Request, res: Response) {
           username: req.body.username,
           password: password_hash,
         });
-        new_user.save({}, (err: mongoose.CallbackError, user: IUser) => {
-          if (err) {
-            res.status(401).json(err.message);
-          } else {
-            var token = create_session(user, req.socket.remoteAddress);
-            var maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
-            res
-              .status(200)
-              .cookie("access_token", token, {
-                maxAge: maxAge,
-                httpOnly: true,
-                secure: true,
-              })
-              .send("Registered succesfully.");
+        await new_user.save(
+          {},
+          async (err: mongoose.CallbackError, user: IUser) => {
+            if (err) {
+              res.status(401).json(err.message);
+            } else {
+              var token = create_session(user, req.socket.remoteAddress);
+              var maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
+              res
+                .status(200)
+                .cookie("access_token", token, {
+                  maxAge: maxAge,
+                  httpOnly: true,
+                  secure: true,
+                })
+                .send("Registered succesfully.");
+            }
           }
-        });
+        );
       }
     }
   );
 };
+
+export default { login, log_out, register };

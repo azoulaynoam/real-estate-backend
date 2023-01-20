@@ -1,5 +1,5 @@
 "use strict";
-import { Schema, model as mongooseModel } from "mongoose";
+import { Document, Schema, model as mongooseModel } from "mongoose";
 
 interface ISession extends Document {
   user_id: Schema.Types.ObjectId;
@@ -12,29 +12,33 @@ interface ISession extends Document {
 /**
  * Represents a loggin session for the admin panel
  */
-const SessionSchema = new Schema<ISession>({
-  user_id: {
-    type: Schema.Types.ObjectId,
-    require: true,
+const SessionSchema = new Schema<ISession>(
+  {
+    user_id: {
+      type: Schema.Types.ObjectId,
+      require: true,
+    },
+    token: {
+      type: String,
+      require: true,
+      unique: true,
+    },
+    login_date: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
+    ip_address: {
+      type: String,
+      require: true,
+    },
+    expireAt: {
+      type: Date,
+      index: { expires: "7d" },
+    },
   },
-  token: {
-    type: String,
-    require: true,
-    unique: true,
-  },
-  login_date: {
-    type: Date,
-    required: true,
-    default: Date.now,
-  },
-  ip_address: {
-    type: String,
-    require: true,
-  },
-  expireAt: {
-    type: Date,
-    index: { expires: "7d" },
-  },
-});
+  { timestamps: true }
+);
 
-export default mongooseModel("Sessions", SessionSchema);
+const sessionModel = mongooseModel<ISession>("Sessions", SessionSchema);
+export { sessionModel, ISession };

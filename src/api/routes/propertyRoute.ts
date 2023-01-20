@@ -1,14 +1,12 @@
 "use strict";
 import core from "express";
 import { Multer } from "multer";
+import admin from "../controllers/adminController";
+import property from "../controllers/propertyController";
+import session from "../controllers/sessionController";
 
 export default function (app: core.Express, upload_files: Multer) {
-  var admin = require("../controllers/adminController");
-  var property = require("../controllers/propertyController");
-  var session = require("../controllers/sessionController");
-
   app.route("/login").get(session.check_token).post(admin.login);
-
   app.route("/logout").get(admin.log_out);
 
   /*app.route('/register')

@@ -1,6 +1,5 @@
 "use strict";
 import { Document, Schema, model as mongooseModel } from "mongoose";
-const { json } = require("express");
 
 interface IProperty extends Document {
   action: string;
@@ -12,9 +11,8 @@ interface IProperty extends Document {
   bathrooms: number;
   size: number;
   price: number;
-  video: string;
-  images: string[];
-  createdAt: Date;
+  video?: string;
+  images: { path: string }[];
 }
 
 /**
@@ -32,58 +30,59 @@ interface IProperty extends Document {
  * @param {[String]} images - An array of images
  */
 
-var PropertySchema = new Schema<IProperty>({
-  action: {
-    type: String,
-    enum: ["sell", "rent"],
-    required: true,
+var PropertySchema = new Schema<IProperty>(
+  {
+    action: {
+      type: String,
+      enum: ["sell", "rent"],
+      required: true,
+    },
+    status: {
+      type: Boolean,
+      required: true,
+    },
+    free_text_en: {
+      type: String,
+      required: true,
+      maxlength: 380,
+    },
+    free_text_he: {
+      type: String,
+      required: true,
+      maxlength: 380,
+    },
+    rooms: {
+      type: Number,
+      required: true,
+    },
+    bedrooms: {
+      type: Number,
+      required: true,
+    },
+    bathrooms: {
+      type: Number,
+      required: true,
+    },
+    size: {
+      type: Number,
+      required: true,
+    },
+    price: {
+      type: Number,
+      required: true,
+    },
+    video: {
+      type: String,
+      required: false,
+    },
+    images: {
+      type: [JSON],
+      required: true,
+      default: [],
+    },
   },
-  status: {
-    type: Boolean,
-    required: true,
-  },
-  free_text_en: {
-    type: String,
-    required: true,
-    maxlength: 380,
-  },
-  free_text_he: {
-    type: String,
-    required: true,
-    maxlength: 380,
-  },
-  rooms: {
-    type: Number,
-    required: true,
-  },
-  bedrooms: {
-    type: Number,
-    required: true,
-  },
-  bathrooms: {
-    type: Number,
-    required: true,
-  },
-  size: {
-    type: Number,
-    required: true,
-  },
-  price: {
-    type: Number,
-    required: true,
-  },
-  video: {
-    type: String,
-    required: false,
-  },
-  images: {
-    type: [JSON],
-    required: false,
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
+  { timestamps: true }
+);
 
-export default mongooseModel("Properties", PropertySchema);
+const propertyModel = mongooseModel<IProperty>("Properties", PropertySchema);
+export { IProperty, propertyModel };

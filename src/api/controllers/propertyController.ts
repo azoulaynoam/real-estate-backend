@@ -1,119 +1,66 @@
 "use strict";
-
-var fs = require("fs");
-var path = require("path");
-var server = require("../../server");
-var Property = server.connection.model("Properties");
-
-// Sorting a json ASC or DESC by chosen field.
-function sortJSON(json, field, order) {
-  return json.sort(function (a, b) {
-    var x = a[field];
-    var y = b[field];
-    if (order === "ASC") {
-      return x < y ? -1 : x > y ? 1 : 0;
-    }
-    if (order === "DESC") {
-      return x > y ? -1 : x < y ? 1 : 0;
-    }
-  });
-}
+import fs from "fs";
+import path from "path";
+import mongoClient from "../../server";
+import { Request, Response } from "express";
+import { IProperty } from "../models/propertyModel";
+const propertyModel = mongoClient.model<IProperty>("Properties");
 
 // Delete files and handeling the errors for existens reasons.
-function delete_file(file_path) {
+const delete_file = (file_path: string) => {
   try {
     fs.unlinkSync(path.join(__dirname + "../../../build" + file_path));
   } catch (err) {
     console.log(err);
   }
-}
+};
 
 /*
     Returning uploaded images and video
 */
-function get_new_files(files) {
-  let images, video;
+const get_new_files = async (
+  files:
+    | Express.Multer.File[]
+    | {
+        [fieldname: string]: Express.Multer.File[];
+      }
+    | undefined
+) => {
+  const images: { path: string }[] = [];
+  let video: string | undefined;
   if (files) {
     Object.keys(files).forEach((key) => {
       switch (key) {
         case "images":
-          images = [];
-          for (let i = 0; i < files["images"].length; i++) {
-            let file_path = "/uploads/" + files["images"][i].filename;
-            images.push({ path: file_path });
-          }
+          if (!Array.isArray(files))
+            for (let i = 0; i < files.images.length; i++) {
+              let file_path = "/uploads/" + files.images[i].filename;
+              images.push({ path: file_path });
+            }
           break;
         case "video":
-          video = "/uploads/" + files["video"][0].filename;
+          if (!Array.isArray(files))
+            video = "/uploads/" + files.video[0].filename;
         default:
           break;
       }
     });
   }
-  return [images, video];
-}
-
-/*
-    Returning chosen images and the actions (checking which images and video used to )
-*/
-async function get_old_files(property, body) {
-  let images, video;
-  if (body.images && body.images !== null) {
-    images = [];
-    if (Array.isArray(body.images)) {
-      body.images.forEach((image) => {
-        if (
-          Array.isArray(property.images) &&
-          property.images.some((img) => img.path == image)
-        ) {
-          images.push({ path: image });
-        }
-      });
-    } else if (
-      Array.isArray(property.images) &&
-      property.images.some((img) => img.path == body.images)
-    ) {
-      images.push({ path: body.images });
-    }
-  }
-  if (body.video) {
-    if (property.video == body.video) {
-      video = body.video;
-    }
-  }
-  return [images, video];
-}
+  return { images, video };
+};
 
 /*
     Get all attributes from body (besides files)
 */
-function create_property_body(body) {
-  let fields = [
-    "action",
-    "status",
-    "free_text_en",
-    "free_text_he",
-    "rooms",
-    "bedrooms",
-    "bathrooms",
-    "size",
-    "price",
-  ];
-  let new_property = {};
-  Object.keys(body).forEach((key) => {
-    if (fields.includes(key)) new_property[key] = body[key];
-  });
-  return new_property;
-}
 
-async function get_property(req, property) {
-  var new_property = create_property_body(req.body);
-  var [images, video] = get_new_files(req.files);
-  var [old_images, old_video] = await get_old_files(property, req.body);
-
-  if (old_images && old_images !== null) {
+const get_property = async (req: Request, property: IProperty) => {
+  let new_property: IProperty = req.body.property;
+  let { images, video } = await get_new_files(req.files);
+  const old_images = property.images;
+  const old_video = property.video;
+  if (old_images && Array.isArray(old_images)) {
     // Adding old images from body.
-    if (images && images !== null) {
+    if (images && Array.isArray(images)) {
       old_images.forEach((img) => {
         if (!images.some((image) => image.path === img.path)) images.push(img);
       });
@@ -131,12 +78,10 @@ async function get_property(req, property) {
   } else if (property.video && property.video != null)
     delete_file(property.video);
 
-  old_images = property.images;
-
   if (old_images && old_images.length) {
     // Deleting unnecessarry files from previus version of property
     if (images && images.length)
-      old_images.forEach((image) => {
+      old_images.forEach((image: { path: string }) => {
         if (!images.some((img) => img.path == image.path)) {
           delete_file(image.path);
         }
@@ -147,80 +92,93 @@ async function get_property(req, property) {
   new_property.video = video;
 
   return new_property;
-}
+};
 
 /**
  * Middleware for finding propertie.
  * Output property at res.locals.property
  */
-exports.middleware = (req, res, next) => {
-  Property.find({ id: req.params.propertyId }, function (err, property) {
-    if (err) {
-      console.log("Error: Property not found.");
-      res.send(err);
-    } else {
-      res.locals.property = property;
-      next();
+const middleware = async (
+  req: Request<{ propertyId: string }>,
+  res: Response<{}, { property: IProperty }>,
+  next: Function
+) => {
+  propertyModel.find(
+    { id: req.params.propertyId },
+    function (err: Error, property: IProperty) {
+      if (err) {
+        console.log("Error: Property not found.");
+        res.send(err);
+      } else {
+        res.locals.property = property;
+        next();
+      }
     }
-  });
+  );
 };
 
 // Property Creation & Save on DB.
-exports.create_property = function (req, res) {
-  let [images, video] = get_new_files(req.files);
-  let new_property = create_property_body(req.body);
-  new_property["status"] = true;
-  if (images) new_property["images"] = images;
-  if (video) new_property["video"] = video;
-  new_property = new Property(new_property);
-  new_property.save(function (err, property) {
-    if (err) res.send(err);
-    else res.json(property).status(201);
-  });
+const create_property = async (req: Request<IProperty>, res: Response) => {
+  let property: IProperty = req.body;
+  const { images, video } = await get_new_files(req.files);
+  property.status = true;
+  if (images && Array.isArray(images)) property.images = images;
+  if (video && !Array.isArray(video)) property.video = video;
+  property = new propertyModel(property);
+  const saved = await property.save();
+  if (saved) res.status(201).json(saved);
+  else res.sendStatus(500);
 };
 
-exports.update_property = async function (req, res) {
-  var property = res.locals.property[0];
+const update_property = async (
+  req: Request<{ propertyId: string }>,
+  res: Response<IProperty, { property: IProperty }>
+) => {
+  var property: IProperty = res.locals.property;
 
   if (!property || property === null) {
     res.sendStatus(404);
   } else {
     var new_property = await get_property(req, property);
 
-    Property.findOneAndUpdate(
+    await propertyModel.findOneAndUpdate(
       { id: req.params.propertyId },
       new_property,
-      { new: true, runValidators: true },
-      function (err, property) {
-        if (err) res.send(err);
-        else res.json(property);
+      function (err: Error, property: IProperty) {
+        if (err) res.send();
+        else res.status(200).json(property ? property : undefined);
       }
     );
   }
 };
 
-exports.read_property = function (req, res) {
-  Property.find({ id: req.params.propertyId }, function (err, property) {
-    if (err) res.send(err);
-    else res.json(property);
-  });
+const read_property = async (
+  req: Request<{ propertyId: string }>,
+  res: Response
+) => {
+  await propertyModel.find(
+    { id: req.params.propertyId },
+    async (err: Error, property: IProperty) => {
+      if (err) res.send(err);
+      else res.json(property);
+    }
+  );
 };
 
-exports.delete_property = function (req, res) {
-  Property.findOneAndDelete(
+const delete_property = async (
+  req: Request<{ propertyId: string }>,
+  res: Response
+) => {
+  await propertyModel.findOneAndDelete(
     { id: req.params.propertyId },
-    function (err, property) {
+    async (err: Error, property: IProperty) => {
       if (err || !property || property === null) {
         res.sendStatus(404);
       } else {
         if (property.images && property.images !== null) {
-          if (Array.isArray(property.images)) {
-            property.images.forEach((image) => {
-              delete_file(image.path);
-            });
-          } else {
-            delete_file(property.images.path);
-          }
+          property.images.forEach(async (image) => {
+            delete_file(image.path);
+          });
         }
         if (property.video && property.video !== null) {
           delete_file(property.video);
@@ -231,77 +189,102 @@ exports.delete_property = function (req, res) {
   );
 };
 
-exports.list_properties = function (req, res) {
-  let fields = [
-    "id",
-    "action",
-    "status",
-    "free_text_en",
-    "free_text_he",
-    "rooms",
-    "bedrooms",
-    "bathrooms",
-    "size",
-    "price",
-  ];
+type sortFields =
+  | "_id"
+  | "action"
+  | "status"
+  | "rooms"
+  | "bedrooms"
+  | "bathrooms"
+  | "size"
+  | "price"
+  | "createdAt";
+
+const list_properties = async (
+  req: Request<
+    any,
+    any,
+    IProperty,
+    {
+      _sort?: sortFields;
+      _order?: "ASC" | "DESC" | undefined;
+      _start?: string;
+      _end?: string;
+    }
+  >,
+  res: Response
+) => {
   let filter = {};
-  let field = null;
-  let order = null;
-  let start = null;
-  let end = null;
+  let field: sortFields | undefined;
+  let order: "ASC" | "DESC" = "ASC";
+  let start: number = 0;
+  let end: number = 0;
   try {
     Object.keys(req.query).forEach((param) => {
       switch (param) {
         case "_sort":
-          if (fields.includes(req.query[param])) field = req.query[param];
+          field = req.query["_sort"];
           break;
         case "_order":
-          order = req.query[param];
+          order = req.query["_order"] ? req.query["_order"] : order;
           break;
         case "_start":
-          start = JSON.parse(req.query[param]);
+          if (req.query["_start"]) start = JSON.parse(req.query["_start"]);
           break;
         case "_end":
-          end = JSON.parse(req.query[param]);
+          if (req.query["_end"]) end = JSON.parse(req.query["_end"]);
           break;
         default:
-          if (param.includes(fields)) filter[param] = req.query[param];
           break;
       }
     });
-  } catch (err) {
-    console.log(err.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Error";
+    console.log(message);
   }
-  Property.find(filter, function (err, properties) {
-    let len = properties.length;
-    if (err) {
-      res.status(404).send(err);
-    } else {
-      if (field) {
-        try {
-          properties = sortJSON(properties, field, order);
-        } catch {
-          res.sendStatus(500);
+
+  const orderObj: { [key: string]: 1 | -1 } = {};
+
+  if (field) {
+    orderObj[field] = order === "ASC" ? 1 : -1;
+  }
+
+  const properties = await propertyModel
+    .find(filter, async (err: Error, properties: IProperty[]) => {
+      const len = properties.length;
+      if (err) {
+        res.status(404).send(err);
+      } else {
+        res.header("Access-Control-Expose-Headers", "X-Total-Count");
+        res.header("X-Total-Count", String(len));
+        if (start || end) {
+          res.header(
+            "Content-Range",
+            "properties " + start + end ? "-" + (end - 1) : "" + "/" + len // Format: properties 0-20/100 (start-end/total)
+          );
         }
+        res.status(200).json(properties);
       }
-      res.header("Access-Control-Expose-Headers", "X-Total-Count");
-      res.header("X-Total-Count", len);
-      if (start || end) {
-        if (start && !end) {
-          properties = properties.slice(start);
-        } else if (end && !start) {
-          properties = properties.slice(start, end);
-        } else {
-          properties = properties.slice(0, end);
-        }
-        res.header(
-          "Content-Range",
-          "properties " + start + "-" + (end - 1) + "/" + len
-        );
-      }
-      res.status(200).json(properties);
-    }
-  }).catch((err) => {
-    console.log(err);
-  });
+    })
+    .skip(start)
+    .limit(end > 0 ? end - start : end)
+    .sort(orderObj)
+    .catch((err) => {
+      console.log(err);
+    });
+
+  if (properties) {
+    res.status(200).json(properties);
+  } else {
+    res.sendStatus(404);
+  }
+};
+
+export default {
+  create_property,
+  update_property,
+  read_property,
+  delete_property,
+  list_properties,
+  middleware,
 };

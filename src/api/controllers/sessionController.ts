@@ -1,9 +1,12 @@
 "use strict";
 
-var server = require("../../server");
-var crypto = require("crypto");
-var Session = server.connection.model("Sessions");
-var User = server.connection.model("Users");
+import { Request, Response } from "express";
+import { ISession, sessionModel } from "../models/sessionModel";
+import mongoClient from "../../server";
+import { IUser } from "../models/userModel";
+import crypto from "crypto";
+var Session = mongoClient.model<ISession>("Sessions");
+var User = mongoClient.model<IUser>("Users");
 
 var token_generator = function () {
   return (
@@ -18,67 +21,76 @@ var token_generator = function () {
 /*
 Middleware for token based authentication.
 */
-exports.middleware = (req, res, next) => {
-  Session.findOne({ token: req.cookies.access_token }, function (err, session) {
-    if (err || session === null) {
-      res.sendStatus(401);
-    } else {
-      User.findOne({ _id: session.user_id }, function (err, user) {
-        if (err || session === null) {
-          console.log("User not found.");
-          res.sendStatus(401);
-        } else {
-          req.user = user;
-          next();
-        }
-      });
-    }
-  });
-};
-
-exports.create_session = function (user, ip_address) {
-  var session = new Session({
-    user_id: user._id,
-    token: token_generator(),
-    ip_address: ip_address,
-  });
-  var generateToken = function (err, token_session) {
-    if (err) {
-      if (err.errors.token) {
-        console.log(err);
-        session.token = token_generator();
-        session.save(generateToken);
+const middleware = (req: Request, res: Response, next: Function) => {
+  Session.findOne(
+    { token: req.cookies.access_token },
+    function (err: Error, session: ISession) {
+      if (err || session === null) {
+        res.sendStatus(401);
       } else {
-        return token_session.token;
+        User.findOne(
+          { _id: session.user_id },
+          function (err: Error, user: IUser) {
+            if (err || session === null) {
+              console.log("User not found.");
+              res.sendStatus(401);
+            } else {
+              res.locals.user = user;
+              next();
+            }
+          }
+        );
       }
     }
-  };
-  session.save(generateToken);
+  );
+};
+
+const create_session = async (user: IUser, ip_address: string) => {
+  let token = await token_generator();
+  let check = await sessionModel.findOne({ token: token });
+  while (check) {
+    token = await token_generator();
+    check = await sessionModel.findOne({ token: token });
+  }
+  const session = new Session({
+    user_id: user._id,
+    token: token,
+    ip_address: ip_address,
+  });
+  await session.save();
   return session.token;
 };
 
-exports.delete_session = function (req, res) {
+const delete_session = async (req: Request, res: Response) => {
   Session.findOneAndDelete(
     { token: req.cookies.access_token },
-    function (err, session) {
+    function (err: Error, session: ISession) {
       if (err) res.sendStatus(404);
       else res.sendStatus(200);
     }
   );
 };
 
-exports.check_token = function (req, res) {
-  Session.findOne({ token: req.cookies.access_token }, function (err, session) {
-    if (err || session === null) {
-      res.sendStatus(401);
-    } else {
-      User.findOne({ _id: session.user_id }, function (err, user) {
-        if (err || session === null) {
-          res.sendStatus(401);
-        } else {
-          res.sendStatus(202);
-        }
-      });
+const check_token = async (req: Request, res: Response) => {
+  Session.findOne(
+    { token: req.cookies.access_token },
+    async (err: Error, session: ISession) => {
+      if (err || session === null) {
+        res.sendStatus(401);
+      } else {
+        await User.findOne(
+          { _id: session.user_id },
+          function (err: Error, user: IUser) {
+            if (err || session === null) {
+              res.sendStatus(401);
+            } else {
+              res.sendStatus(202);
+            }
+          }
+        );
+      }
     }
-  });
+  );
 };
+
+export default { middleware, create_session, delete_session, check_token };

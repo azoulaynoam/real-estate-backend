@@ -7,22 +7,25 @@ interface IUser extends Document {
   permission: number;
 }
 
-var UserSchema = new Schema<IUser>({
-  username: {
-    type: String,
-    require: true,
-    unique: true,
+var UserSchema = new Schema<IUser>(
+  {
+    username: {
+      type: String,
+      require: true,
+      unique: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    permission: {
+      type: Number,
+      enum: [0, 1, 2],
+      default: 0,
+    },
   },
-  password: {
-    type: String,
-    required: true,
-  },
-  permission: {
-    type: Number,
-    enum: [0, 1, 2],
-    default: 0,
-  },
-});
+  { timestamps: true }
+);
 
 const UserModel = mongooseModel("Users", UserSchema);
 export { IUser, UserModel };
