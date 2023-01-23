@@ -1,57 +1,56 @@
 "use strict";
 
 import { Request, Response } from "express";
-import mongoose from "mongoose";
-import mongoClient from "../../server";
-import { IUser } from "../models/userModel";
+import { Document, CallbackError, Types } from "mongoose";
+import { IUser, UserModel } from "../models/userModel";
+import session from "../controllers/sessionController";
 import bcryptjs from "bcryptjs";
-var create_session = require("../controllers/sessionController").create_session;
-var delete_session = require("../controllers/sessionController").delete_session;
-var User = mongoClient.model<IUser>("Users");
 
 /**
  * Logging a user and storing a cookie with a token with experation of 1 week.
  */
-const login = function (req: Request, res: Response) {
-  User.findOne(
-    {
-      username: req.body.username,
-    },
-    function (err: Error, user: IUser) {
-      if (err || user === null) {
-        res.status(401).send("Error: Username Not Found.");
-      } else {
-        bcryptjs.compare(
-          req.body.password,
-          user.password,
-          (err: Error, truePass: boolean) => {
-            if (truePass) {
-              let ip = req.socket.remoteAddress;
-              const token = create_session(user, ip);
-              const maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
-              res
-                .status(200)
-                .cookie("access_token", token, {
-                  maxAge: maxAge,
-                  httpOnly: true,
-                  secure: true,
-                })
-                .send("Logged in succesfully.");
-            } else {
-              res.status(401).send("Error: Wrong Password.");
-            }
-          }
-        );
+const login = async (
+  req: Request<any, any, { username: string; password: string }>,
+  res: Response
+) => {
+  const user = await UserModel.findOne({
+    username: req.body.username,
+  });
+  if (!user) {
+    console.log("User not found");
+    res.status(200).send("Error: Username Not Found.");
+  } else {
+    bcryptjs.compare(
+      req.body.password,
+      user.password,
+      async (err: Error, truePass: boolean) => {
+        if (truePass) {
+          console.log("Logged in succesfully.");
+          let ip = req.socket.remoteAddress;
+          const token = await session.create_session(user, ip);
+          const maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
+          res
+            .status(200)
+            .cookie("access_token", token, {
+              maxAge: maxAge,
+              httpOnly: false,
+              secure: true,
+              sameSite: "none",
+            })
+            .send("Logged in succesfully.");
+        } else {
+          res.status(401).send("Error: Wrong Password.");
+        }
       }
-    }
-  );
+    );
+  }
 };
 
 /**
  * Logging a user out.
  */
 const log_out = function (req: Request, res: Response) {
-  delete_session(req, res);
+  session.delete_session(req, res);
 };
 
 /**
@@ -65,24 +64,33 @@ const register = async (req: Request, res: Response) => {
       if (err) {
         res.status(401).send("Error: Please enter password.");
       } else {
-        var new_user = new User({
+        var new_user = new UserModel({
           username: req.body.username,
           password: password_hash,
         });
         await new_user.save(
           {},
-          async (err: mongoose.CallbackError, user: IUser) => {
+          async (
+            err: CallbackError,
+            user: Document<unknown, any, IUser> &
+              IUser & {
+                _id: Types.ObjectId;
+              }
+          ) => {
             if (err) {
               res.status(401).json(err.message);
             } else {
-              var token = create_session(user, req.socket.remoteAddress);
+              var token = await session.create_session(
+                user,
+                req.socket.remoteAddress
+              );
               var maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
               res
                 .status(200)
                 .cookie("access_token", token, {
                   maxAge: maxAge,
                   httpOnly: true,
-                  secure: true,
+                  secure: false,
                 })
                 .send("Registered succesfully.");
             }

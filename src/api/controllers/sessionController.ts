@@ -1,12 +1,10 @@
 "use strict";
 
 import { Request, Response } from "express";
-import { ISession, sessionModel } from "../models/sessionModel";
-import mongoClient from "../../server";
-import { IUser } from "../models/userModel";
+import { ISession, sessionModel as Session } from "../models/sessionModel";
+import { IUser, UserModel } from "../models/userModel";
 import crypto from "crypto";
-var Session = mongoClient.model<ISession>("Sessions");
-var User = mongoClient.model<IUser>("Users");
+import { Document, Types } from "mongoose";
 
 var token_generator = function () {
   return (
@@ -28,11 +26,10 @@ const middleware = (req: Request, res: Response, next: Function) => {
       if (err || session === null) {
         res.sendStatus(401);
       } else {
-        User.findOne(
+        UserModel.findOne(
           { _id: session.user_id },
           function (err: Error, user: IUser) {
             if (err || session === null) {
-              console.log("User not found.");
               res.sendStatus(401);
             } else {
               res.locals.user = user;
@@ -45,12 +42,18 @@ const middleware = (req: Request, res: Response, next: Function) => {
   );
 };
 
-const create_session = async (user: IUser, ip_address: string) => {
+const create_session = async (
+  user: Document<unknown, any, IUser> &
+    IUser & {
+      _id: Types.ObjectId;
+    },
+  ip_address?: string
+) => {
   let token = await token_generator();
-  let check = await sessionModel.findOne({ token: token });
+  let check = await Session.findOne({ token: token });
   while (check) {
     token = await token_generator();
-    check = await sessionModel.findOne({ token: token });
+    check = await Session.findOne({ token: token });
   }
   const session = new Session({
     user_id: user._id,
@@ -72,25 +75,22 @@ const delete_session = async (req: Request, res: Response) => {
 };
 
 const check_token = async (req: Request, res: Response) => {
-  Session.findOne(
-    { token: req.cookies.access_token },
-    async (err: Error, session: ISession) => {
-      if (err || session === null) {
-        res.sendStatus(401);
-      } else {
-        await User.findOne(
-          { _id: session.user_id },
-          function (err: Error, user: IUser) {
-            if (err || session === null) {
-              res.sendStatus(401);
-            } else {
-              res.sendStatus(202);
-            }
-          }
-        );
-      }
+  if (!req.cookies.access_token) {
+    res.sendStatus(401);
+  } else {
+    const session = await Session.findOne({ token: req.cookies.access_token });
+    if (!session) {
+      res.sendStatus(401);
+    } else {
+      await UserModel.findOne({ _id: session.user_id })
+        .then((user) => {
+          res.sendStatus(200);
+        })
+        .catch((err) => {
+          res.sendStatus(401);
+        });
     }
-  );
+  }
 };
 
 export default { middleware, create_session, delete_session, check_token };

@@ -32,11 +32,11 @@ const SessionSchema = new Schema<ISession>(
     },
     ip_address: {
       type: String,
-      require: true,
+      require: false,
     },
     expireAt: {
       type: Date,
-      index: { expires: "7d" },
+      expires: "7d",
     },
   },
   { timestamps: true }

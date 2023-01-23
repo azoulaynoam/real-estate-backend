@@ -1,10 +1,8 @@
 "use strict";
 import fs from "fs";
 import path from "path";
-import mongoClient from "../../server";
 import { Request, Response } from "express";
-import { IProperty } from "../models/propertyModel";
-const propertyModel = mongoClient.model<IProperty>("Properties");
+import { IProperty, propertyModel } from "../models/propertyModel";
 
 // Delete files and handeling the errors for existens reasons.
 const delete_file = (file_path: string) => {
@@ -249,33 +247,24 @@ const list_properties = async (
   }
 
   const properties = await propertyModel
-    .find(filter, async (err: Error, properties: IProperty[]) => {
-      const len = properties.length;
-      if (err) {
-        res.status(404).send(err);
-      } else {
-        res.header("Access-Control-Expose-Headers", "X-Total-Count");
-        res.header("X-Total-Count", String(len));
-        if (start || end) {
-          res.header(
-            "Content-Range",
-            "properties " + start + end ? "-" + (end - 1) : "" + "/" + len // Format: properties 0-20/100 (start-end/total)
-          );
-        }
-        res.status(200).json(properties);
-      }
-    })
+    .find(filter)
     .skip(start)
     .limit(end > 0 ? end - start : end)
-    .sort(orderObj)
-    .catch((err) => {
-      console.log(err);
-    });
+    .sort(orderObj);
 
-  if (properties) {
-    res.status(200).json(properties);
-  } else {
+  if (!properties || properties.length === 0) {
     res.sendStatus(404);
+  } else {
+    const len = properties.length;
+    res.header("Access-Control-Expose-Headers", "X-Total-Count");
+    res.header("X-Total-Count", String(len));
+    if (start || end) {
+      res.header(
+        "Content-Range",
+        "properties " + start + end ? "-" + (end - 1) : "" + "/" + len // Format: properties 0-20/100 (start-end/total)
+      );
+    }
+    res.status(200).json(properties);
   }
 };
 
