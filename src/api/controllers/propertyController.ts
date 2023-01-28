@@ -5,9 +5,10 @@ import { Request, Response } from "express";
 import { IProperty, propertyModel } from "../models/propertyModel";
 
 // Delete files and handeling the errors for existens reasons.
-const delete_file = (file_path: string) => {
+const delete_file = (file_path?: string) => {
   try {
-    fs.unlinkSync(path.join(__dirname + "../../../build" + file_path));
+    if (file_path)
+      fs.unlinkSync(path.join(__dirname + "../../../build" + file_path));
   } catch (err) {
     console.log(err);
   }
@@ -166,24 +167,22 @@ const delete_property = async (
   req: Request<{ propertyId: string }>,
   res: Response
 ) => {
-  await propertyModel.findOneAndDelete(
-    { id: req.params.propertyId },
-    async (err: Error, property: IProperty) => {
-      if (err || !property || property === null) {
-        res.sendStatus(404);
-      } else {
-        if (property.images && property.images !== null) {
-          property.images.forEach(async (image) => {
-            delete_file(image.path);
-          });
-        }
-        if (property.video && property.video !== null) {
-          delete_file(property.video);
-        }
-        res.sendStatus(202);
-      }
+  const result = await propertyModel
+    .findByIdAndDelete(req.params.propertyId)
+    .exec();
+  if (!result) {
+    res.sendStatus(404);
+  } else {
+    if (result.images && result.images !== null) {
+      result.images.forEach(async (image) => {
+        delete_file(image.path);
+      });
     }
-  );
+    if (result.video && result.video !== null) {
+      delete_file(result.video);
+    }
+    res.sendStatus(202);
+  }
 };
 
 type sortFields =

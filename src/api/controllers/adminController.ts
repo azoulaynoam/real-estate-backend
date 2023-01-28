@@ -18,7 +18,7 @@ const login = async (
   });
   if (!user) {
     console.log("User not found");
-    res.status(200).send("Error: Username Not Found.");
+    res.status(401).send("Error: Username Not Found.");
   } else {
     bcryptjs.compare(
       req.body.password,
@@ -33,9 +33,10 @@ const login = async (
             .status(200)
             .cookie("access_token", token, {
               maxAge: maxAge,
-              httpOnly: false,
+              httpOnly: process.env.NODE_ENV === "DEVELOPMENT" ? false : true,
               secure: true,
-              sameSite: "none",
+              sameSite:
+                process.env.NODE_ENV === "DEVELOPMENT" ? "none" : undefined,
             })
             .send("Logged in succesfully.");
         } else {
