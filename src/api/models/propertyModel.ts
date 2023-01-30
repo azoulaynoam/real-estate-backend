@@ -1,6 +1,6 @@
 "use strict";
 import { Schema } from "mongoose";
-import connection from "../../db/connections";
+import { mongoDB as connection } from "../../db/connections";
 
 interface IProperty {
   action: string;
@@ -12,7 +12,7 @@ interface IProperty {
   bathrooms: number;
   size: number;
   price: number;
-  video?: string;
+  video?: { path: string };
   images: { path: string }[];
 }
 
@@ -73,11 +73,12 @@ var PropertySchema = new Schema<IProperty>(
       required: true,
     },
     video: {
-      type: String,
+      type: { path: String },
       required: false,
+      default: undefined,
     },
     images: {
-      type: [JSON],
+      type: [{ path: String }],
       required: true,
       default: [],
     },

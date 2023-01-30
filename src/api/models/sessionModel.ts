@@ -1,5 +1,5 @@
 "use strict";
-import connection from "../../db/connections";
+import { mongoDB as connection } from "../../db/connections";
 import { Schema } from "mongoose";
 
 interface ISession {

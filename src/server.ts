@@ -4,56 +4,32 @@ import express from "express";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import path from "path";
-import { S3Client } from "@aws-sdk/client-s3";
 import multer from "multer";
 import multerS3 from "multer-s3";
 import cors from "cors";
+import routes from "./api/routes/propertyRoute";
+import { S3Client } from "./db/connections";
 
 dotenv.config();
 const PORT = process.env.PORT || 3000;
 
 const app = express();
 
-import routes from "./api/routes/propertyRoute";
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "./build/uploads/");
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  },
-});
-
-const s3storage = new S3Client({
-  credentials: {
-    accessKeyId: process.env.AWS_S3_ACCESS_KEY_ID
-      ? process.env.AWS_S3_ACCESS_KEY_ID
-      : "",
-    secretAccessKey: process.env.AWS_S3_SECRET_ACCESS_KEY
-      ? process.env.AWS_S3_SECRET_ACCESS_KEY
-      : "",
-  },
-});
-
 const upload_files = multer({
   storage: multerS3({
-    s3: s3storage,
+    s3: S3Client,
     bucket: process.env.AWS_S3_BUCKET_NAME
       ? process.env.AWS_S3_BUCKET_NAME
       : "",
     acl: "public-read",
-    metadata: function (req, file, cb) {
-      console.log(file);
+    metadata: (req, file, cb) => {
       cb(null, { fieldName: file.fieldname });
     },
-    key: function (req, file, cb) {
-      console.log(file);
+    key: (req, file, cb) => {
       cb(null, Date.now().toString());
     },
   }),
-  fileFilter: async (req, file, cb) => {
-    console.log(file);
+  fileFilter: (req, file, cb) => {
     if (file.fieldname === "images") {
       if (file.mimetype.indexOf("image/") === 0) {
         cb(null, true);
@@ -73,7 +49,6 @@ const upload_files = multer({
       cb(null, false);
     }
   },
-  dest: "./build/uploads/",
 });
 
 if (process.env.NODE_ENV === "DEVELOPMENT") {

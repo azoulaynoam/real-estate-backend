@@ -1,6 +1,6 @@
 "use strict";
 
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import { ISession, sessionModel as Session } from "../models/sessionModel";
 import { IUser, UserModel } from "../models/userModel";
 import crypto from "crypto";
@@ -19,7 +19,7 @@ var token_generator = function () {
 /*
 Middleware for token based authentication.
 */
-const middleware = (req: Request, res: Response, next: Function) => {
+const middleware = (req: Request, res: Response, next: NextFunction) => {
   Session.findOne(
     { token: req.cookies.access_token },
     function (err: Error, session: ISession) {

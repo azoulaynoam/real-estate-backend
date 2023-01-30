@@ -1,6 +1,6 @@
 "use strict";
 import { Schema } from "mongoose";
-import connection from "../../db/connections";
+import { mongoDB as connection } from "../../db/connections";
 
 interface IUser {
   username: string;

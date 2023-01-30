@@ -17,7 +17,6 @@ const login = async (
     username: req.body.username,
   });
   if (!user) {
-    console.log("User not found");
     res.status(401).send("Error: Username Not Found.");
   } else {
     bcryptjs.compare(
@@ -25,7 +24,6 @@ const login = async (
       user.password,
       async (err: Error, truePass: boolean) => {
         if (truePass) {
-          console.log("Logged in succesfully.");
           let ip = req.socket.remoteAddress;
           const token = await session.create_session(user, ip);
           const maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds

@@ -3,16 +3,40 @@ import fs from "fs";
 import path from "path";
 import { Request, Response } from "express";
 import { IProperty, propertyModel } from "../models/propertyModel";
+import { S3Client } from "../../db/connections";
 
 // Delete files and handeling the errors for existens reasons.
-const delete_file = (file_path?: string) => {
+const delete_file = async (file_path: string) => {
   try {
-    if (file_path)
-      fs.unlinkSync(path.join(__dirname + "../../../build" + file_path));
-  } catch (err) {
-    console.log(err);
+    const deleted = await S3Client.deleteObject({
+      Bucket: "samantha-azoulay",
+      Key: file_path.split("/").pop(),
+    });
+    return deleted.$metadata.httpStatusCode === 204;
+  } catch (error) {
+    return false;
   }
 };
+
+interface IMulterS3 {
+  fieldname: "images" | "video";
+  originalname: string;
+  encoding: string;
+  mimetype: string;
+  size: number;
+  bucket: string;
+  key: string;
+  acl: string;
+  contentType: string;
+  contentDisposition: string | null;
+  contentEncoding: string | null;
+  storageClass: string;
+  serverSideEncryption: string | null;
+  metadata: [Object];
+  location: string;
+  etag: string;
+  versionId?: string;
+}
 
 /*
     Returning uploaded images and video
@@ -26,20 +50,21 @@ const get_new_files = async (
     | undefined
 ) => {
   const images: { path: string }[] = [];
-  let video: string | undefined;
+  let video: { path: string } | undefined;
   if (files) {
     Object.keys(files).forEach((key) => {
       switch (key) {
         case "images":
           if (!Array.isArray(files))
             for (let i = 0; i < files.images.length; i++) {
-              let file_path = "/uploads/" + files.images[i].filename;
-              images.push({ path: file_path });
+              images.push({
+                path: (files.images[i] as any as IMulterS3).location,
+              }); // files.images[i].location
             }
           break;
         case "video":
           if (!Array.isArray(files))
-            video = "/uploads/" + files.video[0].filename;
+            video = { path: (files.video[0] as any as IMulterS3).location }; // files.video[0].location
         default:
           break;
       }
@@ -52,39 +77,25 @@ const get_new_files = async (
     Get all attributes from body (besides files)
 */
 
-const get_property = async (req: Request, property: IProperty) => {
-  let new_property: IProperty = req.body.property;
+const get_property = async (
+  req: Request<any, any, IProperty>,
+  property: IProperty
+) => {
+  let new_property: IProperty = req.body;
   let { images, video } = await get_new_files(req.files);
   const old_images = property.images;
   const old_video = property.video;
-  if (old_images && Array.isArray(old_images)) {
-    // Adding old images from body.
-    if (images && Array.isArray(images)) {
-      old_images.forEach((img) => {
-        if (!images.some((image) => image.path === img.path)) images.push(img);
-      });
-    } else {
-      images = old_images;
-    }
-  }
-  // Checking for new video, if exists, delete the old one
-  if (video && old_video !== video) {
-    if (property.video && property.video != null) delete_file(property.video);
-  } // Checking for new video, if exists, delete the old one
-  else if (old_video !== property.video) {
-    if (property.video && property.video != null) delete_file(property.video);
-    video = old_video;
-  } else if (property.video && property.video != null)
-    delete_file(property.video);
 
-  if (old_images && old_images.length) {
-    // Deleting unnecessarry files from previus version of property
-    if (images && images.length)
-      old_images.forEach((image: { path: string }) => {
-        if (!images.some((img) => img.path == image.path)) {
-          delete_file(image.path);
-        }
-      });
+  if (old_images.length) {
+    old_images.forEach(async (image) => {
+      if (!images.find((img) => img.path === image.path)) {
+        await delete_file(image.path);
+      }
+    });
+  }
+
+  if (old_video && old_video.path && old_video.path !== video?.path) {
+    await delete_file(old_video.path);
   }
 
   new_property.images = images;
@@ -94,26 +105,20 @@ const get_property = async (req: Request, property: IProperty) => {
 };
 
 /**
- * Middleware for finding propertie.
- * Output property at res.locals.property
+ * Middleware that checks if property exists before uploading the files.
  */
 const middleware = async (
   req: Request<{ propertyId: string }>,
   res: Response<{}, { property: IProperty }>,
   next: Function
 ) => {
-  propertyModel.find(
-    { id: req.params.propertyId },
-    function (err: Error, property: IProperty) {
-      if (err) {
-        console.log("Error: Property not found.");
-        res.send(err);
-      } else {
-        res.locals.property = property;
-        next();
-      }
-    }
-  );
+  const exists = await propertyModel.findById(req.params.propertyId);
+  if (exists) {
+    res.locals.property = exists;
+    next();
+  } else {
+    res.sendStatus(404);
+  }
 };
 
 // Property Creation & Save on DB.
@@ -122,7 +127,7 @@ const create_property = async (req: Request, res: Response) => {
   const { images, video } = await get_new_files(req.files);
   property.status = true;
   if (images && Array.isArray(images)) property.images = images;
-  if (video && !Array.isArray(video)) property.video = video;
+  if (video) property.video = video;
   const saved = await property.save();
   if (saved) res.status(201).json(saved);
   else res.sendStatus(500);
@@ -139,14 +144,12 @@ const update_property = async (
   } else {
     var new_property = await get_property(req, property);
 
-    await propertyModel.findOneAndUpdate(
-      { id: req.params.propertyId },
-      new_property,
-      function (err: Error, property: IProperty) {
-        if (err) res.send();
-        else res.status(200).json(property ? property : undefined);
-      }
+    const result = await propertyModel.findByIdAndUpdate(
+      req.params.propertyId,
+      new_property
     );
+    if (!result) res.sendStatus(404);
+    else res.status(200).json(result);
   }
 };
 
@@ -154,13 +157,9 @@ const read_property = async (
   req: Request<{ propertyId: string }>,
   res: Response
 ) => {
-  await propertyModel.find(
-    { id: req.params.propertyId },
-    async (err: Error, property: IProperty) => {
-      if (err) res.send(err);
-      else res.json(property);
-    }
-  );
+  const result = await propertyModel.findById(req.params.propertyId);
+  if (!result) res.sendStatus(404);
+  res.json(result).status(200);
 };
 
 const delete_property = async (
@@ -175,11 +174,11 @@ const delete_property = async (
   } else {
     if (result.images && result.images !== null) {
       result.images.forEach(async (image) => {
-        delete_file(image.path);
+        await delete_file(image.path);
       });
     }
     if (result.video && result.video !== null) {
-      delete_file(result.video);
+      await delete_file(result.video.path);
     }
     res.sendStatus(202);
   }
