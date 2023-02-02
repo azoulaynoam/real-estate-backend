@@ -49,57 +49,90 @@ const get_new_files = async (
       }
     | undefined
 ) => {
-  const images: { path: string }[] = [];
-  let video: { path: string } | undefined;
+  const new_images: { path: string }[] = [];
+  let new_video: { path: string } | undefined;
   if (files) {
     Object.keys(files).forEach((key) => {
       switch (key) {
         case "images":
           if (!Array.isArray(files))
             for (let i = 0; i < files.images.length; i++) {
-              images.push({
+              new_images.push({
                 path: (files.images[i] as any as IMulterS3).location,
               }); // files.images[i].location
             }
           break;
         case "video":
           if (!Array.isArray(files))
-            video = { path: (files.video[0] as any as IMulterS3).location }; // files.video[0].location
+            new_video = { path: (files.video[0] as any as IMulterS3).location }; // files.video[0].location
         default:
           break;
       }
     });
   }
-  return { images, video };
+  return { new_images, new_video };
 };
 
 /*
-    Get all attributes from body (besides files)
+    Get all attributes from body
 */
 
 const get_property = async (
-  req: Request<any, any, IProperty>,
+  req: Request<
+    any,
+    any,
+    {
+      images?: string[];
+      [key: string]: any;
+    }
+  >,
   property: IProperty
 ) => {
-  let new_property: IProperty = req.body;
-  let { images, video } = await get_new_files(req.files);
+  let new_property: IProperty = {
+    images: property.images,
+    video: property.video,
+    action: req.body.action,
+    bathrooms: req.body.bathrooms,
+    bedrooms: req.body.bedrooms,
+    free_text_en: req.body.free_text_en,
+    free_text_he: req.body.free_text_he,
+    price: req.body.price,
+    rooms: req.body.rooms,
+    size: req.body.size,
+    status: req.body.status,
+  };
+  let { new_images, new_video } = await get_new_files(req.files);
+
   const old_images = property.images;
   const old_video = property.video;
 
-  if (old_images.length) {
+  const updated_images = req.body.images;
+  const updated_video = req.body.video;
+
+  if (
+    updated_images &&
+    Array.isArray(updated_images) &&
+    old_images &&
+    Array.isArray(old_images)
+  )
     old_images.forEach(async (image) => {
-      if (!images.find((img) => img.path === image.path)) {
-        await delete_file(image.path);
+      if (!updated_images.includes(image.path)) {
+        const deleted = await delete_file(image.path);
+      } else {
+        new_images.push({ path: image.path });
       }
     });
-  }
 
-  if (old_video && old_video.path && old_video.path !== video?.path) {
-    await delete_file(old_video.path);
-  }
+  if (
+    !new_video &&
+    updated_video &&
+    old_video &&
+    updated_video === old_video.path
+  )
+    new_video = { path: updated_video };
 
-  new_property.images = images;
-  new_property.video = video;
+  new_property.images = new_images;
+  new_property.video = new_video;
 
   return new_property;
 };
@@ -124,10 +157,10 @@ const middleware = async (
 // Property Creation & Save on DB.
 const create_property = async (req: Request, res: Response) => {
   const property = new propertyModel(req.body);
-  const { images, video } = await get_new_files(req.files);
+  const { new_images, new_video } = await get_new_files(req.files);
   property.status = true;
-  if (images && Array.isArray(images)) property.images = images;
-  if (video) property.video = video;
+  if (new_images && Array.isArray(new_images)) property.images = new_images;
+  if (new_video) property.video = new_video;
   const saved = await property.save();
   if (saved) res.status(201).json(saved);
   else res.sendStatus(500);
@@ -139,18 +172,14 @@ const update_property = async (
 ) => {
   var property: IProperty = res.locals.property;
 
-  if (!property || property === null) {
-    res.sendStatus(404);
-  } else {
-    var new_property = await get_property(req, property);
+  var new_property = await get_property(req, property);
 
-    const result = await propertyModel.findByIdAndUpdate(
-      req.params.propertyId,
-      new_property
-    );
-    if (!result) res.sendStatus(404);
-    else res.status(200).json(result);
-  }
+  const result = await propertyModel.findByIdAndUpdate(
+    req.params.propertyId,
+    new_property
+  );
+  if (!result) res.sendStatus(404);
+  else res.status(200).json(result);
 };
 
 const read_property = async (
