@@ -188,7 +188,7 @@ const read_property = async (
 ) => {
   const result = await propertyModel.findById(req.params.propertyId);
   if (!result) res.sendStatus(404);
-  res.json(result).status(200);
+  else res.json(result).status(200);
 };
 
 const delete_property = async (
@@ -201,15 +201,15 @@ const delete_property = async (
   if (!result) {
     res.sendStatus(404);
   } else {
-    if (result.images && result.images !== null) {
+    res.sendStatus(202);
+    if (result.images) {
       result.images.forEach(async (image) => {
         await delete_file(image.path);
       });
     }
-    if (result.video && result.video !== null) {
+    if (result.video) {
       await delete_file(result.video.path);
     }
-    res.sendStatus(202);
   }
 };
 
