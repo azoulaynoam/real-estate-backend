@@ -26,16 +26,13 @@ jobs:
           cmd: build # will run `yarn build` command
       - name: Generate deployment package
         run: zip -r deploy.zip . -x '*.git*'
-
-  deploy:
-    name: Deploy to Elastic Beanstalk
-    steps:
-      - uses: einaregilsson/beanstalk-deploy@v21
+      - name: Deploy to EB
+        uses: einaregilsson/beanstalk-deploy@v21
         with:
-          - aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          - aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          - application_name: samantha-backend
-          - environment_name: Samanthabackend-env
-          - version_label: ${{ github.sha }}
-          - region: eu-central-1
-          - deployment_package: deploy.zip
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: MyApplicationName
+          environment_name: MyApplication-Environment
+          version_label: ${{ github.sha }}
+          region: us-west-2
+          deployment_package: deploy.zip
