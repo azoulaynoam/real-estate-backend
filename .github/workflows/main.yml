@@ -25,7 +25,7 @@ jobs:
         with:
           cmd: build # will run `yarn build` command
       - name: Generate deployment package
-        run: zip -r deploy.zip . -x '*.git*'
+        run: zip -r deploy.zip ./dist ./node_modules ./Procfile ./package.json -x '*.git*'
       - name: Deploy to EB
         uses: einaregilsson/beanstalk-deploy@v21
         with:
@@ -36,4 +36,4 @@ jobs:
           version_label: ${{ github.sha }}
           region: eu-central-1
           deployment_package: deploy.zip
-          bucket_name: samantha-backend-deployments
+          #existing_bucket_name: samantha-backend-deployments # optional - choose a bucket
