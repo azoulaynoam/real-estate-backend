@@ -4,6 +4,10 @@
   "description": "Samantha Azoulay's Real Estate Website Backend",
   "main": "index.js",
   "author": "Noam Azoulay",
+  "engines": {
+    "node": "19.6.0",
+    "npm": "9.4.1"
+  },
   "scripts": {
     "start": "yarn build && node dist/server.js",
     "dev": "npx nodemon",
