@@ -36,3 +36,4 @@ jobs:
           version_label: ${{ github.sha }}
           region: eu-central-1
           deployment_package: deploy.zip
+          bucket_name: samantha-backend-deployments
