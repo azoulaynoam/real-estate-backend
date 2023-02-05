@@ -9,7 +9,8 @@
     "npm": ">=8.0.0 <9.0.0"
   },
   "scripts": {
-    "start": "yarn build && node dist/server.js",
+    "start-dev": "yarn build && node dist/server.js",
+    "start": "node dist/server.js",
     "dev": "npx nodemon",
     "build": "tsc"
   },
