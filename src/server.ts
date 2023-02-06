@@ -68,7 +68,7 @@ app.use(cookieParser());
 app.use(express.static("build"));
 routes(app, upload_files);
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname + "/build/index.html"));
+  res.status(200).send("Access is forbidden, your IP has been logged");
 });
 
 app.listen(PORT);
