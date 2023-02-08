@@ -159,8 +159,8 @@ const create_property = async (req: Request, res: Response) => {
   const property = new propertyModel(req.body);
   const { new_images, new_video } = await get_new_files(req.files);
   property.status = true;
-  if (new_images && Array.isArray(new_images)) property.images = new_images;
-  if (new_video) property.video = new_video;
+  property.images = new_images;
+  property.video = new_video;
   const saved = await property.save();
   if (saved) res.status(201).json(saved);
   else res.sendStatus(500);
