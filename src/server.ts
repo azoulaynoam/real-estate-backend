@@ -67,7 +67,7 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.static("build"));
 routes(app, upload_files);
-app.get("/health", (req, res) => {
+app.get("*", (req, res) => {
   res.sendStatus(200);
 });
 
