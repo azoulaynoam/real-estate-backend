@@ -26,7 +26,7 @@ const login = async (
         if (truePass) {
           let ip = req.socket.remoteAddress;
           const token = await session.create_session(user, ip);
-          const maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
+          const maxAge = 7 * 24 * 60 * 60 * 1000; // 1 week in miliseconds
           res
             .status(200)
             .cookie("access_token", token, {
@@ -83,13 +83,16 @@ const register = async (req: Request, res: Response) => {
                 user,
                 req.socket.remoteAddress
               );
-              var maxAge = 7 * 24 * 60 * 60 * 1000; // Thats a 1 week in miliseconds
+              var maxAge = 7 * 24 * 60 * 60 * 1000; // 1 Week in miliseconds
               res
                 .status(200)
                 .cookie("access_token", token, {
                   maxAge: maxAge,
-                  httpOnly: true,
-                  secure: false,
+                  httpOnly:
+                    process.env.NODE_ENV === "DEVELOPMENT" ? false : true,
+                  secure: true,
+                  sameSite:
+                    process.env.NODE_ENV === "DEVELOPMENT" ? "none" : undefined,
                 })
                 .send("Registered succesfully.");
             }

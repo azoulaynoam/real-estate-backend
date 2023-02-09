@@ -3,7 +3,6 @@ import compression from "compression";
 import express from "express";
 import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
-import path from "path";
 import multer from "multer";
 import multerS3 from "multer-s3";
 import cors from "cors";
@@ -51,6 +50,7 @@ const upload_files = multer({
   },
 });
 
+// If we are in development mode, we will allow CORS to our client that is on port 3001
 if (process.env.NODE_ENV === "DEVELOPMENT") {
   app.use(
     cors({
@@ -65,7 +65,6 @@ app.use(compression());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
-app.use(express.static("build"));
 routes(app, upload_files);
 app.get("/health", (req, res) => {
   res.sendStatus(200);
