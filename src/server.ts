@@ -50,16 +50,17 @@ const upload_files = multer({
   },
 });
 
-// If we are in development mode, we will allow CORS to our client that is on port 3001
-if (process.env.NODE_ENV === "DEVELOPMENT") {
-  app.use(
-    cors({
-      origin: "http://localhost:3001",
-      credentials: true,
-      methods: ["POST", "PUT", "GET", "OPTIONS", "HEAD", "DELETE"],
-    })
-  );
-}
+// Cors is used to allow cross origin requests.
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV === "DEVELOPMENT"
+        ? "http://localhost:3001"
+        : "https://realestate-in-israel.com",
+    credentials: true,
+    methods: ["POST", "PUT", "GET", "OPTIONS", "HEAD", "DELETE"],
+  })
+);
 
 app.use(compression());
 app.use(bodyParser.urlencoded({ extended: true }));
