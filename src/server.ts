@@ -55,7 +55,7 @@ app.use(
   cors({
     origin:
       process.env.NODE_ENV === "DEVELOPMENT"
-        ? "http://localhost:3001"
+        ? "*"
         : "https://realestate-in-israel.com",
     credentials: true,
     methods: ["POST", "PUT", "GET", "OPTIONS", "HEAD", "DELETE"],

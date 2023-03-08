@@ -267,7 +267,9 @@ const list_properties = async (
     console.log(message);
   }
 
-  const orderObj: { [key: string]: 1 | -1 } = {};
+  const orderObj: { [key: string]: 1 | -1 } = {
+    status: -1,
+  };
 
   if (field) {
     orderObj[field] = order === "ASC" ? 1 : -1;
